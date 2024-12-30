@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>MolNFT on GenesisL1 blockchain</title>
+
+  <!-- =============== BASIC STYLES ================ -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .container {
+      max-width: 600px;
+  display: inline list-item;
+  align-items: center;
+  justify-content: center;
+    }
+    .metadata-table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+    .metadata-table td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      vertical-align: top;
+
+  max-width: 600px;           /* limit to 600px wide */
+  white-space: pre-wrap;      /* preserve line breaks but wrap text */
+  word-wrap: break-word;      /* break words that exceed max width */
+  overflow-wrap: break-word;  /* modern alternative for word wrapping */
+    }
+    .metadata-label {
+      font-weight: bold;
+      width: 30%;
+      background-color: #f8f8f8;
+    }
+    .nft-image {
+      width: 100%;
+      max-width: 400px;
+      display: block;
+      margin: 0 auto 20px auto;
+    }
+    h1 {
+      text-align: center;
+    }
+
+    /* =============== MOL* VIEWER STYLES ================ */
+    /* Make sure the viewer area is visible */
+    #viewerContainer {
+      margin-top: 30px;
+    }
+    #myViewer {
+  width: 100%;
+  height: 420px;
+  border: 1px solid #ccc; /* optional */
+  margin: 20px auto;      /* center on the page */
+  position: relative;     /* for Mol* positioning */
+}
+
+    /* Status container & download button (Mol* area) */
+    #statusContainer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #status {
+      flex: 1; /* Use available space for text */
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #downloadDecodedBtn {
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      display: none; /* hidden until we have a BCIF ready */
+    }
+  </style>
+
+  <!-- =============== MOLSTAR (PDBeMolstar) ================ -->
+  <link
+    rel="stylesheet"
+    type="text/css"
+    href="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css"
+  />
+  <script
+    type="text/javascript"
+    src="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js"
+  ></script>
+</head>
+<body>
+  <div class="container">
+    <h1>MolNFT on GenesisL1 blockchain</h1>
+<p>All data loaded from GenesisL1 blockchain via web3 calls.</p>
+<p>0x2C2B675374D4bBA9BE1B25e7EFEC05a03f85F0e5</p>
+    <img id="nftImage" class="nft-image" src="" alt="NFT Image" />
+<!-- The "Download from chain and render" button -->
+    <div style="margin-top:20px;">
+      <button id="downloadChainBtn" style="padding:10px 15px; cursor:pointer;">
+        Load molecule from GenesisL1 blockchain and render
+      </button>
+    </div>
+  </div>
+
+  <!-- Container for the Mol* viewer, status, and BCIF download -->
+  <div id="viewerContainer" class="container">
+    <div id="statusContainer">
+      <div id="status">No molecule loaded from GenesisL1 blockchain yet.</div>
+      <button id="downloadDecodedBtn">Download Decoded BCIF</button>
+    </div>
+    <div id="myViewer"></div>
+  </div>
+    <table class="metadata-table" id="metadataTable">
+      <!-- Parent metadata rows will be dynamically inserted. -->
+    </table>
+
+   
+
+  <!-- =============== Ethers.js ================ -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  
+  <!-- =============== MAIN SCRIPT ================ -->
+  <script>
+    // ---------- Contract ABI & Setup ----------
+    const abi = [
+      {
+        "inputs": [],
+        "name": "ERC721EnumerableForbiddenBatchMint",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721IncorrectOwner",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "operator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ERC721InsufficientApproval",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "approver",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721InvalidApprover",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "operator",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721InvalidOperator",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721InvalidOwner",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "receiver",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721InvalidReceiver",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          }
+        ],
+        "name": "ERC721InvalidSender",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ERC721NonexistentToken",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "index",
+            "type": "uint256"
+          }
+        ],
+        "name": "ERC721OutOfBoundsIndex",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          }
+        ],
+        "name": "OwnableInvalidOwner",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          }
+        ],
+        "name": "OwnableUnauthorizedAccount",
+        "type": "error"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "approved",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "Approval",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "operator",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "bool",
+            "name": "approved",
+            "type": "bool"
+          }
+        ],
+        "name": "ApprovalForAll",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ChildNFTMinted",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "previousOwner",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "newOwner",
+            "type": "address"
+          }
+        ],
+        "name": "OwnershipTransferred",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ParentNFTMinted",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "from",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "Transfer",
+        "type": "event"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "approve",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "IDCODE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "HEADER",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "ACCESSION_DATE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "COMPOUND",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SOURCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "AUTHOR_LIST",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "RESOLUTION",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "EXPERIMENT_TYPE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SEQUENCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "imageBase64",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "fileBase64",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          }
+        ],
+        "name": "mintNFT",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "renounceOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "safeTransferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes",
+            "name": "data",
+            "type": "bytes"
+          }
+        ],
+        "name": "safeTransferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "operator",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "approved",
+            "type": "bool"
+          }
+        ],
+        "name": "setApprovalForAll",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bool",
+            "name": "status",
+            "type": "bool"
+          }
+        ],
+        "name": "setOnlyDeployerCanMint",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "transferFrom",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "newOwner",
+            "type": "address"
+          }
+        ],
+        "name": "transferOwnership",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "IDCODE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "HEADER",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "ACCESSION_DATE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "COMPOUND",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SOURCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "AUTHOR_LIST",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "RESOLUTION",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "EXPERIMENT_TYPE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SEQUENCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "imageBase64",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "fileBase64",
+            "type": "string"
+          }
+        ],
+        "name": "updateMetadata",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          }
+        ],
+        "name": "balanceOf",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getApproved",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getChildren",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "childIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "getChildrenPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "childIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getCombinedData",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "combinedFileBase64",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "parentId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getEntireNFT",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "IDCODE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "HEADER",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "ACCESSION_DATE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "COMPOUND",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SOURCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "AUTHOR_LIST",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "RESOLUTION",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "EXPERIMENT_TYPE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SEQUENCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "imageBase64",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "combinedFileBase64",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getMetadata",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "IDCODE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "HEADER",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "ACCESSION_DATE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "COMPOUND",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SOURCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "AUTHOR_LIST",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "RESOLUTION",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "EXPERIMENT_TYPE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "SEQUENCE",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "imageBase64",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "fileBase64",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getParent",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "operator",
+            "type": "address"
+          }
+        ],
+        "name": "isApprovedForAll",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "name",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "nextChildId",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "nextNFTId",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "onlyDeployerCanMint",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ownerOf",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByACCESSION_DATE",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByACCESSION_DATEPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByAUTHOR_LIST",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByAUTHOR_LISTPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByCOMPOUND",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByCOMPOUNDPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByEXPERIMENT_TYPE",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByEXPERIMENT_TYPEPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByHEADER",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByHEADERPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByIDCODE",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByIDCODEPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchByRESOLUTION",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchByRESOLUTIONPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchBySEQUENCE",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchBySEQUENCEPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          }
+        ],
+        "name": "searchBySOURCE",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "searchTerm",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "offset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "limit",
+            "type": "uint256"
+          }
+        ],
+        "name": "searchBySOURCEPaginated",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "tokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "total",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes4",
+            "name": "interfaceId",
+            "type": "bytes4"
+          }
+        ],
+        "name": "supportsInterface",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "index",
+            "type": "uint256"
+          }
+        ],
+        "name": "tokenByIndex",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "tokenExists",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "index",
+            "type": "uint256"
+          }
+        ],
+        "name": "tokenOfOwnerByIndex",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "tokenURI",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+    const contractAddress = "0x2C2B675374D4bBA9BE1B25e7EFEC05a03f85F0e5";
+    const tokenId = 1; // The parent NFT to load
+
+    // We will store the combined BCIF blob URL for download
+    let bcifBlobUrl = null;
+
+    // ---------- Utility: Base64 → Uint8Array ----------
+    function base64ToUint8Array(base64) {
+      const cleanedBase64 = base64.replace(/\s/g, "");
+      try {
+        const binaryString = atob(cleanedBase64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+      } catch (error) {
+        console.error("Error decoding Base64:", error);
+        return null;
+      }
+    }
+
+    // ---------- Utility: Update status text ----------
+    function updateStatus(msg) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = msg;
+    }
+
+    // ---------- Load Parent NFT #1 Metadata (on page load) ----------
+    async function loadParentNFT() {
+      try {
+        const provider = new ethers.providers.JsonRpcProvider("https://rpc.genesisl1.org");
+        const contract = new ethers.Contract(contractAddress, abi, provider);
+
+        // 1) Get parent metadata
+        const result = await contract.getMetadata(tokenId);
+        const [
+          IDCODE,
+          HEADER,
+          ACCESSION_DATE,
+          COMPOUND,
+          SOURCE,
+          AUTHOR_LIST,
+          RESOLUTION,
+          EXPERIMENT_TYPE,
+          SEQUENCE,
+          imageBase64,
+          fileBase64
+        ] = result;
+
+        // Display parent image
+        const nftImage = document.getElementById("nftImage");
+        nftImage.src = "data:image/jpeg;base64," + imageBase64;
+
+        // Build metadata table for the parent
+        const table = document.getElementById("metadataTable");
+        function appendRow(label, value) {
+          const row = document.createElement("tr");
+          const cellLabel = document.createElement("td");
+          cellLabel.className = "metadata-label";
+          cellLabel.textContent = label;
+          const cellValue = document.createElement("td");
+          cellValue.textContent = value;
+          row.appendChild(cellLabel);
+          row.appendChild(cellValue);
+          table.appendChild(row);
+        }
+
+        appendRow("IDCODE", IDCODE);
+        appendRow("HEADER", HEADER);
+        appendRow("ACCESSION_DATE", ACCESSION_DATE);
+        appendRow("COMPOUND", COMPOUND);
+        appendRow("SOURCE", SOURCE);
+        appendRow("AUTHOR_LIST", AUTHOR_LIST);
+        appendRow("RESOLUTION", RESOLUTION);
+        appendRow("EXPERIMENT_TYPE", EXPERIMENT_TYPE);
+        appendRow("SEQUENCE", SEQUENCE);
+
+        // 2) Get the children
+        const childIds = await contract.getChildren(tokenId);
+        const numChildren = childIds.length;
+        appendRow("CHILD COUNT", numChildren.toString());
+
+      } catch (error) {
+        console.error("Error loading parent NFT:", error);
+      }
+    }
+
+    // ---------- Download & Render from Chain (child file chunks) ----------
+    async function downloadAndRenderFromChain() {
+      updateStatus("Fetching child IDs...");
+
+      try {
+        const provider = new ethers.providers.JsonRpcProvider("https://rpc.genesisl1.org");
+        const contract = new ethers.Contract(contractAddress, abi, provider);
+
+        // 1) Get the children
+        const childIds = await contract.getChildren(tokenId);
+        if (!childIds || childIds.length === 0) {
+          updateStatus("No children found. Nothing to download.");
+          return;
+        }
+
+        updateStatus(`Found ${childIds.length} child NFT(s). Downloading Base64 chunks...`);
+
+        // 2) For each child, get fileBase64, combine
+        let combinedBase64 = "";
+        for (let i = 0; i < childIds.length; i++) {
+          const cid = childIds[i];
+          updateStatus(`Downloading child ${i+1} of ${childIds.length}... (ID ${cid})`);
+          const cMeta = await contract.getMetadata(cid);
+          // cMeta => [IDCODE, HEADER, ..., fileBase64]
+          const childFileBase64 = cMeta[10]; // index 10 is fileBase64
+          combinedBase64 += childFileBase64; // append
+        }
+
+        updateStatus(`Combining ${childIds.length} Base64 chunk(s)...`);
+        
+        // 3) Decode combined Base64 → BCIF bytes
+        const bcifBytes = base64ToUint8Array(combinedBase64);
+        if (!bcifBytes) {
+          throw new Error("Failed to decode the combined Base64 data.");
+        }
+        updateStatus(`Decoded combined BCIF. Byte length: ${bcifBytes.byteLength}. Creating Blob...`);
+
+        // 4) Create a Blob for Mol* and for download
+        const bcifBlob = new Blob([bcifBytes], { type: "application/octet-stream" });
+        bcifBlobUrl = URL.createObjectURL(bcifBlob);
+
+        updateStatus("BCIF Blob ready. Rendering in Mol*...");
+
+        // 5) Render in Mol*
+        const viewerInstance = new PDBeMolstarPlugin();
+        const viewerElement = document.getElementById("myViewer");
+        const molstarOptions = {
+          customData: {
+            url: bcifBlobUrl,
+            format: "bcif",
+            binary: true
+          }
+          // You can add more PDBeMolstar config here if you like.
+        };
+        viewerInstance.render(viewerElement, molstarOptions);
+
+        updateStatus("Mol* viewer rendered successfully. You can download now.");
+        // Show the "Download Decoded BCIF" button
+        const downloadDecodedBtn = document.getElementById("downloadDecodedBtn");
+        downloadDecodedBtn.style.display = "inline-block"; // make it visible
+        downloadDecodedBtn.disabled = false;
+
+      } catch (err) {
+        console.error("Error downloading/rendering from chain:", err);
+        updateStatus("Error: " + err.message);
+      }
+    }
+
+    // ---------- On page load, get parent NFT metadata ----------
+    window.addEventListener("DOMContentLoaded", loadParentNFT);
+
+    // ---------- Handle the “Download molecule from GenesisL1 blockchain and render” button ----------
+    const downloadChainBtn = document.getElementById("downloadChainBtn");
+    downloadChainBtn.addEventListener("click", downloadAndRenderFromChain);
+
+    // ---------- Handle the “Download Decoded BCIF” button ----------
+    const downloadDecodedBtn = document.getElementById("downloadDecodedBtn");
+    downloadDecodedBtn.addEventListener("click", () => {
+      if (bcifBlobUrl) {
+        const a = document.createElement("a");
+        a.href = bcifBlobUrl;
+        a.download = "decoded.bcif"; // The file name
+        a.click();
+      }
+    });
+  </script>
+<embed src="molnft.pdf" type="application/pdf" width="100%" height="1300px" />
+</body>
+</html>
+
